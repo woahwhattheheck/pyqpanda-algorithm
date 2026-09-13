@@ -208,7 +208,7 @@ jobs:
           fi
           cp "$CANONICAL_WHEEL" release_package/release/
 
-          cat > release_package/README.md << EOF
+          cat > release_package/README.md << 'EOF'
           # PyQPanda Algorithm 发布包
 
           ## Wheel 兼容性
@@ -226,12 +226,14 @@ jobs:
           - `wheels/`: 9 个环境构建/校验副本
           - `docs/`: Sphinx HTML 文档
           - `test_reports/`: 自动化测试报告
-
-          ## 构建信息
-          - 构建系统: GitHub Actions
-          - 构建时间: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          - 环境构建 wheel 数量: $WHEEL_COUNT
           EOF
+          {
+            echo ""
+            echo "## 构建信息"
+            echo "- 构建系统: GitHub Actions"
+            echo "- 构建时间: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- 环境构建 wheel 数量: $WHEEL_COUNT"
+          } >> release_package/README.md
 
           echo "✅ 发布包校验完成"
           find release_package -type f | sort
