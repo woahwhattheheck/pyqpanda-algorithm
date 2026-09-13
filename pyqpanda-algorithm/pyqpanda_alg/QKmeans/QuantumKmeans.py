@@ -160,7 +160,17 @@ class QuantumKmeans:
 
 
         """
+        if isinstance(self.K, (bool, np.bool_)) or not isinstance(self.K, (int, np.integer)):
+            raise ValueError("k must be a positive integer")
+
         n = data.shape[0]
+        if self.K <= 0:
+            raise ValueError("k must be a positive integer")
+        if self.K > n:
+            raise ValueError(
+                f"k ({self.K}) cannot exceed the number of samples ({n})"
+            )
+
         c = data.shape[1]
 
         mean = np.mean(data, axis=0)
