@@ -133,23 +133,19 @@ jobs:
             --junitxml=../output/test_results/junit-results.xml \
             --alluredir=../output/test_results/allure-results \
             --clean-alluredir \
-            --tb=short \
-            --disable-warnings \
-            --maxfail=5 \
-            || true
-          pytest -v \
             --html=../output/test_results/html-report/report.html \
             --self-contained-html \
             --tb=short \
             --disable-warnings \
-            --maxfail=5 \
-            || true
+            --maxfail=5
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: test-results
           path: output/test_results/
+          if-no-files-found: warn
           retention-days: 7
 
   package-all:
