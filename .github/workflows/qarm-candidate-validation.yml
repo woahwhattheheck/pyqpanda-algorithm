@@ -5,6 +5,9 @@ on:
     branches:
       - ci/qarm-validation-base-20260908-sol-01
 
+permissions:
+  contents: read
+
 jobs:
   qarm:
     runs-on: ubuntu-latest
@@ -18,18 +21,26 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r pyqpanda-algorithm/requirements.txt
-          python -m pip install -e pyqpanda-algorithm pytest
+          # The repository package eagerly imports QSVD from pyqpanda_alg/__init__.py,
+          # and QSVD imports pandas even though pandas is not declared in requirements.txt.
+          # Keep this proof-only dependency on the fork validation base rather than
+          # widening the upstream QARM algorithm contribution with an unrelated fix.
+          python -m pip install pandas pytest
+          python -m pip install -e pyqpanda-algorithm
       - name: Public API smoke test
         run: |
           python - <<'PY'
           from pyqpanda_alg.QARM import QuantumAssociationRulesMining
           from pyqpanda_alg.QARM.qarm import QuantumAssociationRulesMining as BaseQARM
           assert issubclass(QuantumAssociationRulesMining, BaseQARM)
+          assert QuantumAssociationRulesMining.__module__ == "pyqpanda_alg.QARM.complete_rules"
           print(QuantumAssociationRulesMining.__module__)
           PY
       - name: Compile QARM contribution
         run: |
-          python -m py_compile             pyqpanda-algorithm/pyqpanda_alg/QARM/complete_rules.py             test/QARM/Test_qarm_complete_rules.py
+          python -m py_compile \
+            pyqpanda-algorithm/pyqpanda_alg/QARM/complete_rules.py \
+            test/QARM/Test_qarm_complete_rules.py
       - name: Run QARM regression suite
         run: |
           python -m pytest -o addopts="" test/QARM -q
