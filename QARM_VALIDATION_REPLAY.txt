@@ -1,0 +1,2 @@
+Frozen QARM candidate: c74d9273bdd87d4e9aacacceb25cf155c9d8dbc8
+Validation base: 3a4e75b2d0969637a6d4deaa39adcf14e6720196
