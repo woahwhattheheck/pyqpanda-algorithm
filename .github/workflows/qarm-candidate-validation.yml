@@ -22,11 +22,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r pyqpanda-algorithm/requirements.txt
-          # The repository package eagerly imports QSVD from pyqpanda_alg/__init__.py,
-          # and QSVD imports pandas even though pandas is not declared in requirements.txt.
-          # Keep this proof-only dependency on the fork validation base rather than
-          # widening the upstream QARM algorithm contribution with an unrelated fix.
-          python -m pip install pandas pytest
+          # The package eagerly imports unrelated algorithm modules from
+          # pyqpanda_alg/__init__.py. QSVD imports pandas and QSVR imports
+          # scikit-learn, but neither is declared in repository requirements.
+          # Keep both as proof-only validation dependencies so the frozen QARM
+          # candidate remains byte-identical to the upstream contribution.
+          python -m pip install pandas scikit-learn pytest
           python -m pip install -e pyqpanda-algorithm
       - name: Public API smoke test
         run: |
