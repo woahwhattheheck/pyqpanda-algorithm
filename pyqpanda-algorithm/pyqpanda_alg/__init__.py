@@ -53,4 +53,5 @@ from . import QmRMR
 from . import QSEncode
 from . import QWalk
 from . import QEC
+from . import ParameterShift
 
