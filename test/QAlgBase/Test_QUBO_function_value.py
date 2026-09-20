@@ -40,6 +40,17 @@ class Test_QUBO_function_value:
         with pytest.raises(ValueError, match="at most two distinct variables"):
             QUBO.QuadraticBinary(x0 * x1 * x2)
 
+    def test_constant_only_dict_keeps_quadratic_matrix_shape(self):
+        qubo = QUBO.QuadraticBinary({
+            'quadratic': None,
+            'linear': None,
+            'constant': 3,
+        })
+
+        assert qubo.quadratic == [[0]]
+        assert qubo.linear == [0]
+        assert qubo.function_value([0]) == 3.0
+
 
 if __name__ == "__main__":
     # 运行测试
