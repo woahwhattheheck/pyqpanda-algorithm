@@ -99,7 +99,7 @@ class QuadraticBinary:
             linear = [0] * len(quadratic)
         if linear is None and quadratic is None:
             linear = [0]
-            quadratic = [0]
+            quadratic = [[0]]
 
         self.constant = constant
         self.linear = linear
