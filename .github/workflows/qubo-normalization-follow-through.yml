@@ -1,0 +1,221 @@
+name: QUBO normalization focused follow-through
+on:
+  push:
+    branches: [maintenance/qubo-normalization-k17-20261004]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      MPLBACKEND: Agg
+      PYTHONDONTWRITEBYTECODE: '1'
+      SOURCE_BRANCH: zz-latticekite/origin-cup-qubo-binary-normalization-20260920
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 6f0fcb2bce1bab858dbc6e4eb7e2f92cd27c4506
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install declared package and focused test dependencies
+        run: python -m pip install -e ./pyqpanda-algorithm pytest scikit-learn
+      - name: Apply source-pinned repair and execute the maintained QUBO file
+        shell: bash
+        run: |
+          python - <<'PYCODE'
+          """One-shot, source-pinned maintenance of an existing QUBO contribution."""
+          import hashlib
+          import importlib.metadata
+          import json
+          import os
+          from pathlib import Path
+          import platform
+          import statistics
+          import subprocess
+          import sys
+          import xml.etree.ElementTree as ET
+
+          SOURCE = Path('pyqpanda-algorithm/pyqpanda_alg/QUBO/QUBO.py')
+          TESTS = Path('test/QAlgBase/Test_QUBO_function_value.py')
+          BASE = '6f0fcb2bce1bab858dbc6e4eb7e2f92cd27c4506'
+          SOURCE_BLOB = '460b5be347fef94bade5828066029677378d623d'
+          TEST_BLOB = '4b82b77ddc784527821943a0a578cdd597193700'
+
+          def blob(data):
+              return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+
+          def require(condition, message):
+              if not condition:
+                  raise RuntimeError(message)
+
+          old_source, old_tests = SOURCE.read_bytes(), TESTS.read_bytes()
+          require(blob(old_source) == SOURCE_BLOB, 'QUBO source moved; do not overwrite')
+          require(blob(old_tests) == TEST_BLOB, 'QUBO tests moved; do not overwrite')
+          require(subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip() == BASE,
+                  'Contribution branch moved; refresh before publication')
+
+          addition = '''
+              def test_binary_normalization_cancels_higher_order_support(self):
+                  x0, x1, x2 = sp.symbols('x0 x1 x2')
+                  function = x0 * x1 * x2 - x0 ** 2 * x1 * x2 + 2 * x0 * x1 - x2 + 3
+                  qubo = QUBO.QuadraticBinary(function)
+
+                  for bits in np.ndindex(2, 2, 2):
+                      expected = float(function.subs(dict(zip((x0, x1, x2), bits))))
+                      assert qubo.function_value(bits) == expected
+
+              def test_binary_normalization_accumulates_before_float_conversion(self):
+                  x0 = sp.symbols('x0')
+                  large = sp.Integer(2) ** 60
+                  qubo = QUBO.QuadraticBinary(large * x0 ** 3 + (3 - large) * x0)
+
+                  assert qubo.function_value([0]) == 0.0
+                  assert qubo.function_value([1]) == 3.0
+
+              def test_binary_normalization_retains_nonzero_higher_order_residue(self):
+                  x0, x1, x2 = sp.symbols('x0 x1 x2')
+                  function = x0 * x1 * x2 - (1 - sp.Rational(1, 10 ** 30)) * x0 ** 2 * x1 * x2
+
+                  with pytest.raises(ValueError, match="at most two distinct variables"):
+                      QUBO.QuadraticBinary(function)
+          '''
+          marker = b'\r\n\r\nif __name__ == "__main__":'
+          require(old_tests.count(marker) == 1, 'Regression insertion point changed')
+          new_tests = old_tests.replace(marker, addition.replace('\n','\r\n').encode() + marker)
+          TESTS.write_bytes(new_tests)
+
+          run_dir = Path(os.environ['RUNNER_TEMP']) / 'qubo69-results'
+          run_dir.mkdir(exist_ok=True)
+
+          def run_tests(label):
+              junit = run_dir / (label + '.xml')
+              cmd = [sys.executable, '-m', 'pytest', '-q', str(TESTS), '--junitxml=' + str(junit)]
+              result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+              print(result.stdout, flush=True)
+              (run_dir / (label + '.log')).write_text(result.stdout)
+              require(junit.is_file(), label + ' failed before producing a result')
+              suites = list(ET.parse(junit).getroot().iter('testsuite'))
+              counts = {key: sum(int(s.attrib.get(key, 0)) for s in suites)
+                        for key in ('tests','failures','errors','skipped')}
+              failures = [case.attrib['name'] for case in ET.parse(junit).getroot().iter('testcase')
+                          if case.find('failure') is not None]
+              return {'exit': result.returncode, **counts, 'failed_names': failures}
+
+          before = run_tests('before')
+          expected_failures = {
+              'test_binary_normalization_cancels_higher_order_support',
+              'test_binary_normalization_accumulates_before_float_conversion',
+          }
+          require(before == {'exit': 1, 'tests': 8, 'failures': 2, 'errors': 0, 'skipped': 0,
+                             'failed_names': list(before['failed_names'])}
+                  and set(before['failed_names']) == expected_failures,
+                  'Baseline did not isolate the two expected defects; inspect before publication')
+
+          old = '''    # This also lets algebraically distinct polynomial monomials accumulate into
+              # one canonical QUBO coefficient (for example x0**2*x1 and x0*x1**3).
+              for coeff, powers in zip(coeffs, monoms):
+                  support = [index for index, power in enumerate(powers) if power > 0]
+                  if len(support) > 2:
+          '''
+          new = '''    # Accumulate exact coefficients first: higher-order supports may cancel,
+              # and converting each monomial to float can discard a small surviving sum.
+              normalized = {}
+              for coeff, powers in zip(coeffs, monoms):
+                  support = tuple(index for index, power in enumerate(powers) if power > 0)
+                  normalized[support] = normalized.get(support, sp.S.Zero) + coeff
+
+              for support, coeff in normalized.items():
+                  if coeff == 0:
+                      continue
+                  if len(support) > 2:
+          '''
+          old_bytes = old.replace('\n','\r\n').encode()
+          new_bytes = new.replace('\n','\r\n').encode()
+          require(old_source.count(old_bytes) == 1, 'Normalization edit preimage changed')
+          new_source = old_source.replace(old_bytes, new_bytes)
+          SOURCE.write_bytes(new_source)
+          after = run_tests('after')
+          require(after == {'exit': 0, 'tests': 8, 'failures': 0, 'errors': 0, 'skipped': 0,
+                            'failed_names': []}, 'Repaired focused file is not clean')
+
+          versions = {name: importlib.metadata.version(name)
+                      for name in ('numpy','sympy','pyqpanda3','pytest')}
+          run_url = (f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/"
+                     f"{os.environ['GITHUB_RUN_ID']}")
+          report = f'''# QUBO binary-normalization follow-through
+
+          The existing contribution is extended in place. Normalization now combines exact
+          SymPy coefficients by binary variable support **before** classifying the surviving
+          terms or storing floating-point matrix coefficients.
+
+          ## Repaired behavior
+
+          - `x0*x1*x2 - x0**2*x1*x2 + 2*x0*x1 - x2 + 3` is a valid binary quadratic
+            expression. The old implementation rejected the first three-variable support
+            before its equal-and-opposite support could cancel. The repaired public
+            `QuadraticBinary` evaluates it correctly on all eight binary assignments.
+          - `2**60*x0**3 + (3 - 2**60)*x0` normalizes to `3*x0`. The old implementation
+            rounded each contribution into a floating-point array before combining them,
+            losing the surviving coefficient. Exact support aggregation retains it.
+          - A nonzero three-variable residue of `1/10**30` still raises `ValueError`.
+            No numerical tolerance is used to discard unsupported terms.
+
+          The earlier power-normalization, upper-triangular matrix convention, variable
+          order, constant-only dictionary repair, and all solver/circuit APIs are preserved.
+          Final numeric arrays still use the existing floating-point representation; this
+          is not an arbitrary-precision output or quantum-simulation claim.
+
+          ## Executed evidence
+
+          Run: {run_url}
+
+          Original contribution head: `{BASE}`.
+          Original source blob: `{SOURCE_BLOB}`.
+          Executed repaired source blob: `{blob(new_source)}`.
+          Executed regression blob: `{blob(new_tests)}`.
+
+          The original five cases plus three focused regressions were run using the real
+          installed package and its native imports. Before: 6 passed, 2 failed; exactly the
+          two new cancellation/precision regressions failed. After: 8 passed, no failures,
+          errors or skips. The cancellation case enumerates eight assignments; that is one
+          regression, not eight additional test cases.
+
+          Command (the unchanged maintained file is the sole collection target):
+
+          ```sh
+          python -m pytest -q test/QAlgBase/Test_QUBO_function_value.py --junitxml=<output>
+          ```
+
+          Python `{platform.python_version()}`; platform `{platform.platform()}`.
+          Observed package versions: `{json.dumps(versions, sort_keys=True)}`.
+
+          The standard runner installed the repository-declared package requirements and
+          pytest. Complete before/after output is retained in the linked job log. No full
+          repository suite, simulator circuit execution, deployment, sponsor acceptance,
+          prize decision or payment is claimed. The commit containing this report has the
+          same source and regression blobs as the executed candidate.
+          '''
+          report_path = Path('docs/qubo-binary-normalization-follow-through.md')
+          require(not report_path.exists(), 'Report path already exists; preserve it')
+          report_path.parent.mkdir(exist_ok=True)
+          report_path.write_text(report, encoding='utf-8')
+          subprocess.run(['git','diff','--check'], check=True)
+          print(json.dumps({'before': before, 'after': after, 'source_blob': blob(new_source),
+                            'test_blob': blob(new_tests), 'versions': versions}, indent=2), flush=True)
+          PYCODE
+      - name: Publish to the original contribution branch without force
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$SOURCE_BRANCH"
+          test "$(git rev-parse FETCH_HEAD)" = 6f0fcb2bce1bab858dbc6e4eb7e2f92cd27c4506
+          git config user.name woahwhattheheck
+          git config user.email '293286387+woahwhattheheck@users.noreply.github.com'
+          git add -- pyqpanda-algorithm/pyqpanda_alg/QUBO/QUBO.py test/QAlgBase/Test_QUBO_function_value.py docs/qubo-binary-normalization-follow-through.md
+          git commit -m 'fix(qubo): combine exact binary coefficients before validation'
+          git push origin HEAD:"refs/heads/$SOURCE_BRANCH"
+          echo "PUBLISHED_SHA=$(git rev-parse HEAD)"
+          git show --stat --oneline HEAD
