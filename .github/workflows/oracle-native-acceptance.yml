@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p evidence
-          python -m pip install -r pyqpanda-algorithm/requirements.txt 'pyqpanda3==0.5.0' 'pytest==9.1.1' scikit-learn allure-pytest 2>&1 | tee evidence/install.log
+          python -m pip install -r pyqpanda-algorithm/requirements.txt 'pyqpanda3==0.5.0' 'pytest==9.1.1' scikit-learn pandas allure-pytest 2>&1 | tee evidence/install.log
           python -m pip freeze > evidence/environment.txt
           python -VV >> evidence/environment.txt
           uname -a >> evidence/environment.txt
