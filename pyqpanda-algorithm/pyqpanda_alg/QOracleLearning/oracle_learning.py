@@ -98,15 +98,26 @@ def phase_oracle_diagonal(table: Sequence[int]) -> tuple[int, ...]:
 
 
 def walsh_probabilities(table: Sequence[int]) -> tuple[float, ...]:
-    """Return exact output probabilities by independent Walsh transform."""
+    """Return probabilities via an independent O(N log N) Walsh transform.
+
+    N is the truth-table length. Integer butterflies preserve the exact signed
+    sums and natural basis-index order; only the final normalization uses float.
+    This classical reference uses O(N) workspace and no quantum backend.
+    """
     values = validate_truth_table(table)
     size = len(values)
+    spectrum = [1 - 2 * bit for bit in values]
+    half = 1
+    while half < size:
+        for start in range(0, size, 2 * half):
+            for index in range(start, start + half):
+                left, right = spectrum[index], spectrum[index + half]
+                spectrum[index] = left + right
+                spectrum[index + half] = left - right
+        half *= 2
+
     probs: list[float] = []
-    for y in range(size):
-        total = 0
-        for x, fx in enumerate(values):
-            parity = (x & y).bit_count() & 1
-            total += -1 if (fx ^ parity) else 1
+    for total in spectrum:
         amplitude = total / size
         probs.append(float(amplitude * amplitude))
     return tuple(probs)
