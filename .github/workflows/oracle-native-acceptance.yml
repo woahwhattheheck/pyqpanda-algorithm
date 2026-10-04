@@ -1,0 +1,66 @@
+name: Oracle-learning native acceptance
+on:
+  push:
+    branches: [validation/origin59-native-20261004-3600]
+    paths: [.github/workflows/oracle-native-acceptance.yml]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: woahwhattheheck/pyqpanda-algorithm
+          ref: b04476c0e4486d8b6e3bc503965d8fd1dac9192d
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install declared dependencies and focused test runner
+        shell: bash
+        run: |
+          mkdir -p evidence
+          python -m pip install -r pyqpanda-algorithm/requirements.txt pytest scikit-learn 2>&1 | tee evidence/install.log
+          python -m pip freeze > evidence/environment.txt
+          python -VV >> evidence/environment.txt
+          uname -a >> evidence/environment.txt
+          git rev-parse HEAD > evidence/source-sha.txt
+          git ls-tree -r HEAD > evidence/source-tree.txt
+      - name: Run unchanged native and reference cases
+        id: tests
+        shell: bash
+        env:
+          PYTHONPATH: pyqpanda-algorithm
+        run: |
+          python -c "from pyqpanda3.core import CPUQVM; print('Native CPUQVM:', CPUQVM)" | tee evidence/native-import.txt
+          python -m pytest -q test/QOracleLearning/Test_oracle_learning.py --junitxml=evidence/tests.xml 2>&1 | tee evidence/tests.log
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          suites = ET.parse('evidence/tests.xml').getroot().iter('testsuite')
+          totals = {key: 0 for key in ('tests', 'failures', 'errors', 'skipped')}
+          for suite in suites:
+              for key in totals:
+                  totals[key] += int(suite.get(key, '0'))
+          print('Maintained selection:', totals)
+          assert totals == {'tests': 9, 'failures': 0, 'errors': 0, 'skipped': 0}, totals
+          PY
+          python pyqpanda-algorithm/example/QAlgBase/testeg_QOracleLearning.py 2>&1 | tee evidence/example.log
+          git diff --exit-code
+      - name: Retain exact source and evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p evidence
+          git archive --format=tar.gz HEAD > evidence/source.tar.gz
+          git status --porcelain > evidence/source-status.txt
+          find evidence -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > evidence-manifest.sha256
+          cp evidence-manifest.sha256 evidence/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: origin59-native-acceptance
+          path: evidence/
+          retention-days: 14
+          if-no-files-found: error

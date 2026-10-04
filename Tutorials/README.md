@@ -1,2 +1,0 @@
-# QPanda-Toturial
-# pyQPanda-Toturial
