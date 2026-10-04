@@ -1,0 +1,77 @@
+{
+  "measurement": "single-process classical Walsh reference; not quantum simulator speed",
+  "baseline_commit": "b04476c0e4486d8b6e3bc503965d8fd1dac9192d",
+  "baseline_git_blob": "b12c975f3b0d526c4e587052d64eb0a1e376b02d",
+  "candidate_git_blob": "e50b89adde095c32dbd06abd36b794c76282b1f4",
+  "candidate_sha256": "5f072a8548cac1f33729dd97da18829ce4859730a3b0e3b7ca175102c02277e8",
+  "benchmark_sha256": "a65ebba1ba3d4a5b3a3198bb8e668240f2441783c02839e34c18e4f07ce26417",
+  "python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "cpu": "AMD EPYC 9V74 80-Core Processor",
+  "clock": "time.perf_counter_ns",
+  "repeats": 3,
+  "seed": 20261004,
+  "exhaustive_boolean_tables": 276,
+  "cases": [
+    {
+      "width": 8,
+      "truth_table_entries": 256,
+      "input_sha256": "d3f72629f3936be300a4ffc60988106fc8cf344296e4e9aebb9811867093b0e4",
+      "baseline_seconds": [
+        0.004735682,
+        0.004599446,
+        0.004616731
+      ],
+      "candidate_seconds": [
+        0.000150407,
+        0.000113141,
+        0.000118079
+      ],
+      "baseline_median_seconds": 0.004616731,
+      "candidate_median_seconds": 0.000118079,
+      "median_speedup": 39.098662759677836,
+      "exact_output_equal": true,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "width": 10,
+      "truth_table_entries": 1024,
+      "input_sha256": "ba7ecaf16ad0a46857fd0191218b561ae3b7fa80cc4d26fdf79603e2d81c5524",
+      "baseline_seconds": [
+        0.082309677,
+        0.083448233,
+        0.082667967
+      ],
+      "candidate_seconds": [
+        0.000735139,
+        0.000661487,
+        0.00068988
+      ],
+      "baseline_median_seconds": 0.082667967,
+      "candidate_median_seconds": 0.00068988,
+      "median_speedup": 119.82948773699772,
+      "exact_output_equal": true,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "width": 12,
+      "truth_table_entries": 4096,
+      "input_sha256": "dd2888eb99b9cd40f04ecb6f7a47e46cb402290f6301ba090fc12d15877028ae",
+      "baseline_seconds": [
+        1.412087413,
+        1.444574486,
+        1.459600066
+      ],
+      "candidate_seconds": [
+        0.003360036,
+        0.003415931,
+        0.003691485
+      ],
+      "baseline_median_seconds": 1.444574486,
+      "candidate_median_seconds": 0.003415931,
+      "median_speedup": 422.8933447426192,
+      "exact_output_equal": true,
+      "max_absolute_difference": 0.0
+    }
+  ]
+}
