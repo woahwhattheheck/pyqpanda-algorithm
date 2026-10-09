@@ -13,6 +13,7 @@ and execution helpers import ``pyqpanda3`` lazily.
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from operator import index as _integer_index
 from typing import Any
 
 
@@ -24,7 +25,7 @@ def _normalise_bits(bits: str | Sequence[int], *, name: str) -> tuple[int, ...]:
             raise ValueError(f"{name} must contain only '0' and '1'")
         return tuple(int(ch) for ch in bits)
     try:
-        values = tuple(int(v) for v in bits)
+        values = tuple(_integer_index(v) for v in bits)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} must be a bit sequence") from exc
     if not values:
@@ -37,7 +38,7 @@ def _normalise_bits(bits: str | Sequence[int], *, name: str) -> tuple[int, ...]:
 def validate_truth_table(table: Sequence[int]) -> tuple[int, ...]:
     """Validate a Boolean truth table and return it as an immutable tuple."""
     try:
-        values = tuple(int(v) for v in table)
+        values = tuple(_integer_index(v) for v in table)
     except (TypeError, ValueError) as exc:
         raise ValueError("truth table must be a sequence of bits") from exc
     if len(values) < 2 or len(values) & (len(values) - 1):
