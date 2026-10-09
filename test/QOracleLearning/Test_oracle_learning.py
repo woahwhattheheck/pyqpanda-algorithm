@@ -55,6 +55,22 @@ def test_recover_secret_rejects_non_affine_table():
         q.recover_affine_secret((0, 1, 1, 1))
 
 
+def test_integral_bit_contract_rejects_lossy_casts():
+    # int(0.5) and int(1.9) used to silently rewrite the promised oracle.
+    # Both explicit truth tables and q0-first bit sequences must reject them.
+    for values in ([0, 0.5], [1.9, 0], ["0", "1"]):
+        with pytest.raises(ValueError, match="truth table must be a sequence of bits"):
+            q.validate_truth_table(values)
+    for secret in ([0.5, 1], [1, 1.9], ["1", "0"]):
+        with pytest.raises(ValueError, match="secret must be a bit sequence"):
+            q.affine_truth_table(secret)
+    with pytest.raises(ValueError, match="bits must be a bit sequence"):
+        q.q0_bits_to_index([1, 0.5])
+    # Integer and Boolean bit values retain the existing public contract.
+    assert q.validate_truth_table([False, True]) == (0, 1)
+    assert q.affine_truth_table([True, False]) == (0, 1, 0, 1)
+
+
 def test_secret_and_probability_validation():
     for secret in ("", "10x", [1, 2]):
         with pytest.raises(ValueError):
